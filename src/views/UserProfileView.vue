@@ -3,10 +3,10 @@
       <div class="row">
         <div class="col-3">
             <UserProfileInfo @follow="follow" @unfollow="unfollow" :user="user" />
-            <UserProfileWrite @post_a_post="post_a_post"/>
+            <UserProfileWrite v-if="is_me" @post_a_post="post_a_post" />
         </div>
         <div class="col-9">
-            <UserProfilePosts :posts="posts" />
+            <UserProfilePosts :user="user" :posts="posts" @delete_a_post="delete_a_post"/>
         </div>
       </div>
     </ContentBase>
@@ -18,6 +18,10 @@ import UserProfileInfo from '@/components/UserProfileInfo.vue';
 import UserProfilePosts from '@/components/UserProfilePosts.vue';
 import UserProfileWrite from '@/components/UserProfileWrite.vue';
 import { reactive } from 'vue';
+import { useRoute } from 'vue-router';
+import { useStore } from 'vuex';
+import $ from 'jquery';
+import { computed } from 'vue';
 
 export default {
     name: "UserProfileView",
@@ -28,35 +32,44 @@ export default {
         UserProfileWrite,
     },
     setup() {
-        const user = reactive({
-            id: 1,
-            username: "ppshu",
-            lastName: "shu",
-            firstName: "pp",
-            followerCount: 0,
-            is_followed: false,
-        });
+        const store = useStore();
+        const route = useRoute();
+        const userId = parseInt(route.params.userId);
+        const user = reactive({});
+        const posts = reactive({});
 
-        const posts = reactive({
-            count: 3,
-            posts: [
-                {
-                    id: 1,
-                    userId: 1,
-                    content: "1111111",
-                },
-                {
-                    id: 2,
-                    userId: 1,
-                    content: "2222222",
-                },
-                {
-                    id: 3,
-                    userId: 1,
-                    content: "3333333",
-                }
-            ]
-        })
+        $.ajax({
+        url: 'https://app165.acapp.acwing.com.cn/myspace/getinfo/',
+        type: "GET",
+        data: {
+          user_id: userId,
+        },
+        headers: {
+          'Authorization': "Bearer " + store.state.user.access,
+        },
+        success(resp) {
+          user.id = resp.id;
+          user.username = resp.username;
+          user.photo = resp.photo;
+          user.followerCount = resp.followerCount;
+          user.is_followed = resp.is_followed;
+        }
+      });
+
+      $.ajax({
+        url: "https://app165.acapp.acwing.com.cn/myspace/post/",
+        type: "GET",
+        data: {
+            user_id: userId,
+        },
+        headers: {
+            'Authorization': 'Bearer ' + store.state.user.access,
+        },
+        success(resp) {
+            posts.count = resp.length;
+            posts.posts = resp;
+        }
+      })
 
         const follow = () => {
             if (user.is_followed) return;
@@ -81,12 +94,21 @@ export default {
             })
         };
 
+        const delete_a_post = post_id => {
+          posts.posts = posts.posts.filter(post => post.id !== post_id);
+          posts.count = posts.posts.length;
+        }
+
+        const is_me = computed(() => userId === store.state.user.id)
+
         return {
             user,
             follow,
             unfollow,
             posts,
             post_a_post,
+            delete_a_post,
+            is_me,
         }
     }
 }
